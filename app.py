@@ -25,6 +25,14 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from sentence_transformers import SentenceTransformer
 
+if os.getenv('STREAMLIT_PRODUCTION'):
+    gen_ai_key = st.secrets["GENAI_KEY"]
+    gen_ai_stream_key = st.secrets["GENAI_CONVERSATION_STREAM_API"]
+else:
+    load_dotenv()
+    gen_ai_key = os.getenv("GENAI_KEY")
+    gen_ai_stream_key = os.getenv("GENAI_CONVERSATION_STREAM_API")
+
 
 # get the text from the pdf files
 def get_pdf_text(pdf_docs):
@@ -50,7 +58,7 @@ def get_text_chunks(text):
 
 # create a FAISS vector store and store embeddings
 def get_vector_store(text_chunks):
-    credentials = Credentials(api_key=os.getenv('GENAI_KEY'))
+    credentials = Credentials(api_key=gen_ai_key)
     client = Client(credentials=credentials)
     embeddings = LangChainEmbeddingsInterface(
         client=client,
@@ -64,7 +72,7 @@ def get_vector_store(text_chunks):
 # create llm coversation chain
 def get_conversation_chain(vector_store):
     memory = ConversationBufferMemory(memory_key='chat_history', return_messages=True)
-    credentials = Credentials(api_key=os.getenv('GENAI_KEY'), api_endpoint=os.getenv('GENAI_CONVERSATION_STREAM_API'))
+    credentials = Credentials(api_key=gen_ai_key, api_endpoint=gen_ai_stream_key)
     client = Client(credentials=credentials)
 
     llm = LangChainChatInterface(
@@ -96,7 +104,6 @@ def handle_user_input(user_question):
 
 
 def main():
-    load_dotenv()
 
     st.title("Chat with multiple PDFs :books:")
     # initialize chat history
