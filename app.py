@@ -25,7 +25,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from sentence_transformers import SentenceTransformer
 
-if os.getenv('STREAMLIT_PRODUCTION'):
+if "SERVER_PORT" in os.environ:
     gen_ai_key = st.secrets["GENAI_KEY"]
     gen_ai_stream_key = st.secrets["GENAI_CONVERSATION_STREAM_API"]
 else:
