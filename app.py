@@ -1,7 +1,7 @@
 import os
 
 import streamlit as st
-from dotenv import load_dotenv
+
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
 
@@ -24,14 +24,6 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from sentence_transformers import SentenceTransformer
-
-if "SERVER_PORT" in os.environ:
-    gen_ai_key = st.secrets["GENAI_KEY"]
-    gen_ai_stream_key = st.secrets["GENAI_CONVERSATION_STREAM_API"]
-else:
-    load_dotenv()
-    gen_ai_key = os.getenv("GENAI_KEY")
-    gen_ai_stream_key = os.getenv("GENAI_CONVERSATION_STREAM_API")
 
 
 # get the text from the pdf files
@@ -57,7 +49,7 @@ def get_text_chunks(text):
 
 
 # create a FAISS vector store and store embeddings
-def get_vector_store(text_chunks):
+def get_vector_store(text_chunks, gen_ai_key):
     credentials = Credentials(api_key=gen_ai_key)
     client = Client(credentials=credentials)
     embeddings = LangChainEmbeddingsInterface(
@@ -70,9 +62,9 @@ def get_vector_store(text_chunks):
 
 
 # create llm coversation chain
-def get_conversation_chain(vector_store):
+def get_conversation_chain(vector_store, gen_ai_key):
     memory = ConversationBufferMemory(memory_key='chat_history', return_messages=True)
-    credentials = Credentials(api_key=gen_ai_key, api_endpoint=gen_ai_stream_key)
+    credentials = Credentials(api_key=gen_ai_key, api_endpoint='https://bam-api.res.ibm.com/v2/text/chat?version=2024-01-10')
     client = Client(credentials=credentials)
 
     llm = LangChainChatInterface(
@@ -105,7 +97,25 @@ def handle_user_input(user_question):
 
 def main():
 
+    with st.sidebar:
+        gen_ai_key = st.text_input('Please enter your Watsonx API key', key='gen_ai_key', type='password')
+        st.subheader("Your documents")
+        pdf_docs = st.file_uploader("Upload your PDFs here and click on 'Process", accept_multiple_files=True)
+        if st.button("Process"):
+            with st.spinner("Processing"):
+                # get pdf text
+                raw_text = get_pdf_text(pdf_docs)
+
+                # get the text chunks
+                text_chunks = get_text_chunks(raw_text)
+                # create vector store
+                vector_store = get_vector_store(text_chunks, gen_ai_key)
+
+                # create conversation chain
+                st.session_state.conversation = get_conversation_chain(vector_store, gen_ai_key)
+
     st.title("Chat with multiple PDFs :books:")
+
     # initialize chat history
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -114,6 +124,9 @@ def main():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
     # accept user input
+    if not gen_ai_key:
+        st.info("Please add your Watsonx API key to continue.")
+        st.stop()
     if prompt := st.chat_input("Ask a question about your document"):
         # add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
@@ -126,22 +139,6 @@ def main():
             st.markdown(response)
         # add assistance response to chat history
         st.session_state.messages.append({"role": "assistant", "content": response})
-
-    with st.sidebar:
-        st.subheader("Your documents")
-        pdf_docs = st.file_uploader("Upload your PDFs here and click on 'Process", accept_multiple_files=True)
-        if st.button("Process"):
-            with st.spinner("Processing"):
-                # get pdf text
-                raw_text = get_pdf_text(pdf_docs)
-
-                # get the text chunks
-                text_chunks = get_text_chunks(raw_text)
-                # create vector store
-                vector_store = get_vector_store(text_chunks)
-
-                # create conversation chain
-                st.session_state.conversation = get_conversation_chain(vector_store)
 
 
 if __name__ == '__main__':
