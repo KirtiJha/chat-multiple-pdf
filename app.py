@@ -72,7 +72,7 @@ def get_conversation_chain(vector_store, gen_ai_key):
         client=client,
         parameters=TextGenerationParameters(
             decoding_method=DecodingMethod.SAMPLE,
-            max_new_tokens=100,
+            max_new_tokens=3800,
             min_new_tokens=10,
             temperature=0.5,
             top_k=50,
